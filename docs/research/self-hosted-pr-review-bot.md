@@ -4,6 +4,20 @@ Research date: **2026-11-16**. Scope: **your own/team’s private repositories, 
 
 This is a research/design document, not an implementation. Statements about API behavior link to primary sources. Architecture, defaults, and limits labeled as recommendations are proposed product decisions—not platform requirements. Pi integration was checked against the locally installed **`@earendil-works/pi-coding-agent` 1.5.2** documentation and SDK examples; upstream links may change.
 
+## Decisions and handoff for the next agent
+
+**Status: research and planning only; no bot implementation or deployment exists in this repository yet.** These user decisions take precedence over older recommendations below:
+
+- Build the HTTP/webhook server in **Rust**. GitHub is the first host; keep the core extensible to other Git hosting platforms.
+- Use **PostgreSQL only** for both application data and the durable job queue. **Do not use SQLite.** When implementing the queue, teach the user how PostgreSQL queues, job claiming/locking, retries, and crash recovery work.
+- When database work begins, inspect and use the user's existing PostgreSQL deployment at **`~/dev/kumarmo2/homelab/pg/`**. Do not deploy a separate PostgreSQL instance for this bot. Connection/networking, database/user provisioning, migrations, and permissions remain to be investigated; do not assume the deployment configuration.
+- For ingress, inspect and use the existing **Caddy** setup at **`~/dev/kumarmo2/homelab/vps-infra/`** instead of deploying another reverse proxy. Its current configuration, routing, and deployment process have not yet been inspected.
+- Review automatically **only on opening a non-draft PR**. No automatic review when a PR is pushed to, reopened, or marked ready. An authorized human with repository read access or higher can explicitly request a review via a PR conversation mention such as `@my-bot review`, including on a draft. The exact bot account name is not yet chosen. The detailed event, deduplication, and stale-snapshot policy is in section 3.
+- Use **Pi with a configurable model and thinking level** for reviewing changes. A restricted separate runner is recommended; the Pi SDK versus CLI/RPC integration and exact model/provider remain open decisions.
+- Initial target: private repositories, GitHub first, self-hosted/Docker-friendly. Research and explanation should remain beginner-friendly.
+
+The original guide contains recommendations as well as these decisions; do not treat recommendations as user-approved requirements. Do not modify the external homelab projects without reading their current contents first and following the user's instructions.
+
 ## 1. The short answer
 
 Build a small service around Pi, rather than asking Pi to operate the whole bot:
@@ -26,11 +40,11 @@ Non-draft PR opened OR authorized person comments @my-bot review on a PR
 | Concern | Recommendation | Why |
 |---|---|---|
 | GitHub identity | GitHub App installed on selected repositories | Bot identity; scoped permissions; short-lived installation tokens |
-| Implementation language | TypeScript/Node.js | Direct Pi SDK integration; one language across receiver/worker |
-| Hosting | Docker Compose on one always-on Linux server | Fits your existing hosting preference without Kubernetes |
-| Public endpoint | Caddy reverse proxy + HTTPS domain | GitHub needs a reachable webhook destination |
-| Durable state and queue | PostgreSQL, with jobs stored in the database | One durable backing service; no Redis required initially |
-| Reviewer | Pi SDK in a separate restricted runner process/container | Explicit model, thinking, tools, resources, and session lifecycle |
+| HTTP server language | **Rust** | User decision; receives and verifies webhooks |
+| Hosting | Docker-friendly self-hosting | Fits the user's existing infrastructure preference |
+| Public endpoint | Existing Caddy in `~/dev/kumarmo2/homelab/vps-infra/` | User decision; inspect before configuring |
+| Durable state and queue | Existing PostgreSQL in `~/dev/kumarmo2/homelab/pg/` | User decision: PostgreSQL for both application data and jobs; no SQLite |
+| Reviewer | Restricted separate Pi runner; SDK or CLI integration to be decided | Explicit model, thinking, tools, resources, and session lifecycle |
 | Initial review context | Diff plus bounded surrounding source supplied by the worker | Easier to secure and reproduce than a fully autonomous coding agent |
 | Initial reviewer tools | None; later add narrowly scoped source-reading tools | No need to execute code merely to analyze text |
 | PR output | Advisory `COMMENT` review: short summary + a few inline findings | Useful feedback without approval/merge-policy implications |
@@ -39,7 +53,7 @@ Non-draft PR opened OR authorized person comments @my-bot review on a PR
 | Concurrency | One review at a time initially; serialize per PR | Lower cost and fewer races; obsolete jobs do not start replacement reviews |
 | Future Git hosts | Provider adapters around a neutral review model | Keep GitHub-specific authentication and line mapping out of the reviewer |
 
-The stack above is a recommendation, not a claim that every PR bot uses it. A single-process/SQLite prototype is possible; an in-memory queue is not appropriate once you expect reviews to survive restarts. Self-hosted GitHub Actions is another possible execution mechanism, but I recommend an independent webhook service for your cross-platform goal.
+The table combines user decisions with recommendations; see the handoff above. An in-memory queue is not appropriate once reviews must survive restarts. Self-hosted GitHub Actions is another possible execution mechanism, but an independent webhook service supports the cross-platform goal.
 
 **Important distinction: self-hosting the bot does not self-host the model.** If you select a hosted model API, the supplied private code/context leaves your server for that provider. Pi also supports compatible local inference endpoints; model privacy, hardware requirements, and review quality are separate decisions. [P5]
 
@@ -212,7 +226,7 @@ A timeline comment, a submitted review, and an inline review comment are differe
 
 | Interface | Meaning | Fit for this bot |
 |---|---|---|
-| TypeScript SDK | Embed Pi and configure its lifecycle/resources directly | **Recommended** in an isolated runner |
+| TypeScript SDK | Embed Pi and configure its lifecycle/resources directly | Recommended candidate for an isolated runner separate from Rust; not yet selected |
 | Print CLI | One invocation, final assistant text on stdout | Fast proof of concept; subprocess timeout is straightforward |
 | JSON CLI | One invocation, stream JSONL lifecycle/model/tool events | Useful for progress and usage capture |
 | RPC | Long-lived subprocess controlled by JSONL commands | Useful if the main application is not TypeScript |
@@ -526,7 +540,7 @@ Caddy :443 ----> Webhook API ----> PostgreSQL
                            Restricted Pi runner ----> Model endpoint
 ```
 
-Five long-lived Compose services are enough: **proxy, API, worker, database, runner**. The API/worker can share an image. The runner can accept bounded review inputs over an internal authenticated endpoint or another narrow protocol; it needs no database access or GitHub credentials.
+Caddy and PostgreSQL are **existing homelab services**, not new services to deploy in this bot's Compose stack. The bot may deploy its Rust API, worker, and restricted runner as separate services or processes; their final packaging is undecided. Inspect both homelab configurations before planning integration and do not assume they share a host or network. The runner can accept bounded review inputs over an internal authenticated endpoint or another narrow protocol; it needs no database access or GitHub credentials.
 
 Initial runner design: one job at a time, fresh Pi session/child process and temporary workspace per job, no tools. Container reuse is not the same as a fresh per-job security boundary. Stronger per-job containers/VMs can follow if your threat model requires them. Never mount the Docker socket into the Pi runner to let it create its own sandbox.
 
@@ -551,8 +565,8 @@ Use Compose secrets or an appropriate secret manager with per-service grants. Co
 
 Persist:
 
-- PostgreSQL data, schema migrations, and tested backups.
-- Caddy certificate/ACME state.
+- PostgreSQL data, schema migrations, and tested backups, integrated with the existing homelab PostgreSQL deployment.
+- Existing Caddy certificate/ACME state, managed according to the homelab setup.
 - Trusted non-secret configuration and versioned review prompts.
 - Only the review artifacts/transcripts you deliberately retain.
 
@@ -609,7 +623,8 @@ Goal: establish that the reviewer is useful before building event plumbing.
 
 - Add signed webhooks, durable jobs, lease recovery, bounded retries, command authorization/deduplication, and stale-job cancellation.
 - Automatically review only non-draft `opened` PRs. Also accept new PR conversation comments containing the explicit bot review command from humans with repository read access or higher; allow these explicit requests on drafts.
-- Deploy with HTTPS and Compose; set per-job/daily spend and resource limits.
+- Integrate with the existing homelab PostgreSQL and Caddy deployments; package bot services for the selected self-hosting setup and set per-job/daily spend and resource limits.
+- Teach PostgreSQL queue concepts during implementation, including claims/locks, transaction boundaries, retries, leases, and crash recovery.
 
 **Exit criterion:** restart during collection/review/publication does not lose accepted work or blindly double-post; pushes invalidate stale jobs without creating new reviews; ready/reopen/edit actions do not trigger reviews.
 
@@ -654,12 +669,13 @@ The architecture does not require choosing these today:
 - Exact model/provider and acceptable private-code data policy.
 - Monthly/daily model budget and per-review limits.
 - Whether GitHub App ownership must cover one organization or several accounts.
-- Domain/ingress details of your Docker host.
+- Domain, host/network topology, connection credentials, and integration details of the existing Caddy and PostgreSQL deployments; inspect their homelab directories when the relevant work begins.
+- Pi runner integration: TypeScript SDK versus a controlled CLI/RPC subprocess.
 - Which file types/generated outputs to exclude.
 - Whether repository instructions can influence review criteria through an approved policy path.
 - Artifact/transcript retention and backup policy.
 
-**My recommended first build:** TypeScript + GitHub App + PostgreSQL-backed jobs + Docker Compose + isolated no-tool Pi runner, posting advisory reviews only. Add complexity when a measured need appears—not because mature commercial bots have it.
+**Current direction:** Rust HTTP server + GitHub-first adapter + the existing homelab PostgreSQL for data and jobs + the existing homelab Caddy + an isolated Pi runner. Advisory reviews, a GitHub App, and a no-tool initial runner remain recommendations. Add complexity when a measured need appears—not because mature commercial bots have it.
 
 ---
 
