@@ -4,10 +4,10 @@ Minimal unauthenticated test webhook server. It does not verify or process webho
 
 ```sh
 cd review-bot-api
-cargo run
+go run .
 ```
 
-The server listens on `127.0.0.1:8888` by default. Set `PORT` to change the port, for example `PORT=8889 cargo run`. The Caddy route currently proxies to port `8888`; update the route if the deployed port changes. If containerizing, arrange for the API to be reachable at the VPS host's `127.0.0.1:8888` (the server itself currently binds loopback inside its network namespace).
+The server listens on `127.0.0.1:8888` by default. Set `PORT` to change the port, for example `PORT=8889 go run .`. The Caddy route currently proxies to port `8888`; update the route if the deployed port changes. If containerizing, arrange for the API to be reachable at the VPS host's `127.0.0.1:8888` (the server itself currently binds loopback inside its network namespace).
 
 Test locally:
 

@@ -6,9 +6,9 @@ This is a research/design document, not an implementation. Statements about API 
 
 ## Decisions and handoff for the next agent
 
-**Status: research and planning only; no bot implementation or deployment exists in this repository yet.** These user decisions take precedence over older recommendations below:
+**Status: a minimal Go test webhook exists in `review-bot-api/`; review logic and deployment are not yet implemented or verified.** The project is named **Patchguard**. These user decisions take precedence over older recommendations below:
 
-- Build the HTTP/webhook server in **Rust**. GitHub is the first host; keep the core extensible to other Git hosting platforms.
+- Build the HTTP/webhook server in **Go**; implement normally and explain Go concepts when the user asks. GitHub is the first host; keep the core extensible to other Git hosting platforms.
 - Use **PostgreSQL only** for both application data and the durable job queue. **Do not use SQLite.** When implementing the queue, teach the user how PostgreSQL queues, job claiming/locking, retries, and crash recovery work.
 - When database work begins, inspect and use the user's existing PostgreSQL deployment at **`~/dev/kumarmo2/homelab/pg/`**. Do not deploy a separate PostgreSQL instance for this bot. Connection/networking, database/user provisioning, migrations, and permissions remain to be investigated; do not assume the deployment configuration.
 - For ingress, inspect and use the existing **Caddy** setup at **`~/dev/kumarmo2/homelab/vps-infra/`** instead of deploying another reverse proxy. Its current configuration, routing, and deployment process have not yet been inspected.
@@ -40,7 +40,7 @@ Non-draft PR opened OR authorized person comments @my-bot review on a PR
 | Concern | Recommendation | Why |
 |---|---|---|
 | GitHub identity | GitHub App installed on selected repositories | Bot identity; scoped permissions; short-lived installation tokens |
-| HTTP server language | **Rust** | User decision; receives and verifies webhooks |
+| HTTP server language | **Go** | User decision; supports brushing up on Go skills |
 | Hosting | Docker-friendly self-hosting | Fits the user's existing infrastructure preference |
 | Public endpoint | Existing Caddy in `~/dev/kumarmo2/homelab/vps-infra/` | User decision; inspect before configuring |
 | Durable state and queue | Existing PostgreSQL in `~/dev/kumarmo2/homelab/pg/` | User decision: PostgreSQL for both application data and jobs; no SQLite |
@@ -226,7 +226,7 @@ A timeline comment, a submitted review, and an inline review comment are differe
 
 | Interface | Meaning | Fit for this bot |
 |---|---|---|
-| TypeScript SDK | Embed Pi and configure its lifecycle/resources directly | Recommended candidate for an isolated runner separate from Rust; not yet selected |
+| TypeScript SDK | Embed Pi and configure its lifecycle/resources directly | Recommended candidate for an isolated runner separate from Go; not yet selected |
 | Print CLI | One invocation, final assistant text on stdout | Fast proof of concept; subprocess timeout is straightforward |
 | JSON CLI | One invocation, stream JSONL lifecycle/model/tool events | Useful for progress and usage capture |
 | RPC | Long-lived subprocess controlled by JSONL commands | Useful if the main application is not TypeScript |
@@ -540,7 +540,7 @@ Caddy :443 ----> Webhook API ----> PostgreSQL
                            Restricted Pi runner ----> Model endpoint
 ```
 
-Caddy and PostgreSQL are **existing homelab services**, not new services to deploy in this bot's Compose stack. The bot may deploy its Rust API, worker, and restricted runner as separate services or processes; their final packaging is undecided. Inspect both homelab configurations before planning integration and do not assume they share a host or network. The runner can accept bounded review inputs over an internal authenticated endpoint or another narrow protocol; it needs no database access or GitHub credentials.
+Caddy and PostgreSQL are **existing homelab services**, not new services to deploy in this bot's Compose stack. The bot may deploy its Go API, worker, and restricted runner as separate services or processes; their final packaging is undecided. Inspect both homelab configurations before planning integration and do not assume they share a host or network. The runner can accept bounded review inputs over an internal authenticated endpoint or another narrow protocol; it needs no database access or GitHub credentials.
 
 Initial runner design: one job at a time, fresh Pi session/child process and temporary workspace per job, no tools. Container reuse is not the same as a fresh per-job security boundary. Stronger per-job containers/VMs can follow if your threat model requires them. Never mount the Docker socket into the Pi runner to let it create its own sandbox.
 
@@ -675,7 +675,7 @@ The architecture does not require choosing these today:
 - Whether repository instructions can influence review criteria through an approved policy path.
 - Artifact/transcript retention and backup policy.
 
-**Current direction:** Rust HTTP server + GitHub-first adapter + the existing homelab PostgreSQL for data and jobs + the existing homelab Caddy + an isolated Pi runner. Advisory reviews, a GitHub App, and a no-tool initial runner remain recommendations. Add complexity when a measured need appears—not because mature commercial bots have it.
+**Current direction:** Go HTTP server + GitHub-first adapter + the existing homelab PostgreSQL for data and jobs + the existing homelab Caddy + an isolated Pi runner. Advisory reviews, a GitHub App, and a no-tool initial runner remain recommendations. Add complexity when a measured need appears—not because mature commercial bots have it.
 
 ---
 
