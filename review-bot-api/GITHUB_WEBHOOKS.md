@@ -39,7 +39,7 @@ After verifying the signature, handle only `X-GitHub-Event: pull_request`:
 - **`edited`**: Run only if `changes.body` is present and the bot mention is in the new description (`pull_request.body`) but not the old one (`changes.body.from`). An edit that leaves an existing mention in place does not retrigger the bot. Skip title-only or base-branch-only edits.
 - **Other actions and events**: Ignore them for review purposes. This includes new commits (`synchronize`), reopened PRs, comments, and installation events.
 
-Use the exact request bytes and the configured webhook secret to compute the expected signature, then compare in constant time before parsing the JSON. The webhook secret is separate from the GitHub App private key, which is used to authenticate the app to GitHub's API. The current handler returns `200 OK` without validating or processing deliveries; use a test repository until verification is implemented.
+Use the exact request bytes and the configured webhook secret to compute the expected signature, then compare in constant time before parsing the JSON. The webhook secret is separate from the GitHub App private key, which is used to authenticate the app to GitHub's API. The current handler decodes `pull_request` deliveries and logs only the delivery ID, action, repository, and PR number. It acknowledges other events without decoding them. Signature verification and review triggers are not implemented; use a test repository for now.
 
 ## Inspect a real delivery
 

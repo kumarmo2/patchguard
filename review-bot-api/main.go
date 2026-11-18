@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -18,10 +21,37 @@ const SECRET_PASSWORD_FILE string = "SECRET_PASSWORD_FILE"
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /webhooks/github", func(w http.ResponseWriter, r *http.Request) {
-		eventType := r.Header.Get("X-GitHub-Event")
-		fmt.Println("eventType: ", eventType)
+		if r.Header.Get("X-GitHub-Event") != "pull_request" {
+			fmt.Fprint(w, "OK\n")
+			return
+		}
+
+		const maxWebhookBodyBytes = 25_000_000
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes))
+		if err != nil {
+			var tooLarge *http.MaxBytesError
+			if errors.As(err, &tooLarge) {
+				http.Error(w, "webhook body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, "failed to read webhook body", http.StatusBadRequest)
+			return
+		}
+
+		// TODO: Verify X-Hub-Signature-256 over body before decoding it.
+		var event *GitHubPullRequestRequest
+		if err := json.Unmarshal(body, &event); err != nil || event == nil {
+			http.Error(w, "invalid pull_request payload", http.StatusBadRequest)
+			return
+		}
+
+		var repository string
+		if event.Repository != nil {
+			repository = event.Repository.FullName
+		}
+		log.Printf("github webhook event=pull_request delivery=%q action=%q repository=%q number=%d",
+			r.Header.Get("X-GitHub-Delivery"), event.Action, repository, event.Number)
 		fmt.Fprint(w, "OK\n")
-		// TODO: first this we need to do is authroize the request.
 	})
 	return mux
 }
