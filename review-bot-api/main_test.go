@@ -15,7 +15,7 @@ func TestWebhook(t *testing.T) {
 		status int
 		body   string
 	}{
-		{"post webhook", http.MethodPost, "/webhooks/github", http.StatusOK, "OK"},
+		{"post webhook", http.MethodPost, "/webhooks/github", http.StatusOK, "OK\n"},
 		{"wrong method", http.MethodGet, "/webhooks/github", http.StatusMethodNotAllowed, ""},
 		{"wrong path", http.MethodPost, "/other", http.StatusNotFound, ""},
 	}
