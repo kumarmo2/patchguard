@@ -1,0 +1,17 @@
+[Unit]
+Description=Patchguard webhook API
+After=network.target
+
+[Service]
+Type=simple
+User=review-bot
+Group=review-bot
+WorkingDirectory=/opt/patchguard/review-bot-api
+Environment=HOME=/var/lib/review-bot
+Environment=PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/make run
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
