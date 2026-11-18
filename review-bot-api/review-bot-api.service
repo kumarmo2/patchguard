@@ -9,6 +9,8 @@ Group=review-bot
 WorkingDirectory=/opt/patchguard/review-bot-api
 Environment=HOME=/var/lib/review-bot
 Environment=PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+Environment=env=dev
+EnvironmentFile=/etc/patchguard/review-bot-api.env
 ExecStart=/usr/bin/make run
 Restart=on-failure
 RestartSec=5s

@@ -5,16 +5,9 @@ set -eu
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 releases=/opt/patchguard/releases
 
-if ! id review-bot >/dev/null 2>&1; then
-    sudo useradd --system --user-group --home-dir /var/lib/review-bot --shell /usr/sbin/nologin review-bot
-fi
-if ! getent group review-bot >/dev/null 2>&1; then
-    echo 'The review-bot group is missing; create it before deploying.' >&2
-    exit 1
-fi
+sh "$source_dir/deploy-ready.sh" --check
 
 sudo install -d -m 0755 /opt/patchguard "$releases"
-sudo install -d -o review-bot -g review-bot /var/lib/review-bot
 release=$(sudo mktemp -d "$releases/review-bot-api.XXXXXXXX")
 sudo chmod 0755 "$release"
 
