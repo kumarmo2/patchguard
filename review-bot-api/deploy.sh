@@ -7,6 +7,14 @@ releases=/opt/patchguard/releases
 
 sh "$source_dir/deploy-ready.sh" --check
 
+# Refresh the service account's vault before switching releases or restarting it.
+if ! sudo -u review-bot -g review-bot env -u BW_SESSION -u BITWARDENCLI_DEBUG \
+    HOME=/var/lib/review-bot PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin \
+    timeout 60s bw sync --nointeraction; then
+    printf '%s\n' 'Vaultwarden sync failed; deployment aborted. Check network access and bw login for review-bot.' >&2
+    exit 1
+fi
+
 sudo install -d -m 0755 /opt/patchguard "$releases"
 release=$(sudo mktemp -d "$releases/review-bot-api.XXXXXXXX")
 sudo chmod 0755 "$release"
