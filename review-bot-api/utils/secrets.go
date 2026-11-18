@@ -20,8 +20,6 @@ type VaultWardenCliSecretManager struct {
 	cacheMutex sync.RWMutex
 }
 
-var password string
-
 func NewSecretsManager(bwPasFilePath string) (SecretsManager, error) {
 	if bwPasFilePath == "" {
 		return nil, fmt.Errorf("bwPasFilePath cannot be empty")
@@ -70,6 +68,8 @@ func (self *VaultWardenCliSecretManager) GetSecret(ctx context.Context, key stri
 
 	session := strings.TrimSpace(string(token))
 
+	// Bitwarden treats a name as a search and may return a similarly named item.
+	// Use an item ID for an exact lookup. TODO: verify exact matches for names.
 	get := exec.CommandContext(ctx, "bw", "get", "password", key, "--raw")
 	get.Env = append(get.Environ(), fmt.Sprintf("BW_SESSION=%s", session))
 

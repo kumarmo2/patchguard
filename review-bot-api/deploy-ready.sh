@@ -13,8 +13,16 @@ fail() {
     exit 1
 }
 
-config_matches() {
-    printf '%s\n' "$config_line" | sudo cmp -s "$config_file" -
+check_config() {
+    if ! sudo awk -v required="$config_line" '
+        /^[[:space:]]*SECRET_PASSWORD_FILE[[:space:]]*=/ {
+            assignments++
+            if ($0 == required) matches++
+        }
+        END { exit (assignments != 1 || matches != 1) }
+    ' "$config_file"; then
+        fail "$config_file must include exactly one $config_line assignment. Other settings are allowed."
+    fi
 }
 
 check_setup() {
@@ -24,9 +32,7 @@ check_setup() {
     if ! sudo -u review-bot -g review-bot test -w "$service_home"; then
         fail "The service account cannot write to $service_home. Run make deploy-ready first."
     fi
-    if ! config_matches; then
-        fail "$config_file must contain only $config_line. Run make deploy-ready or update the existing file manually."
-    fi
+    check_config
     if ! sudo -u review-bot -g review-bot test -f "$password_file" ||
        ! sudo -u review-bot -g review-bot test -r "$password_file" ||
        ! sudo -u review-bot -g review-bot test -s "$password_file"; then
@@ -70,8 +76,8 @@ sudo install -d -o review-bot -g review-bot -m 0750 "$service_home"
 sudo install -d -o root -g root -m 0755 "$config_dir"
 sudo install -d -o root -g review-bot -m 0750 "$secret_dir"
 
-if sudo test -e "$config_file" && ! config_matches; then
-    fail "$config_file already exists and differs; update it manually to contain only $config_line."
+if sudo test -e "$config_file"; then
+    check_config
 fi
 if sudo test -e "$password_file"; then
     if ! sudo cmp -s "$source_file" "$password_file"; then
