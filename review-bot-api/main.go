@@ -18,6 +18,8 @@ const SECRET_PASSWORD_FILE string = "SECRET_PASSWORD_FILE"
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /webhooks/github", func(w http.ResponseWriter, r *http.Request) {
+		eventType := r.Header.Get("X-GitHub-Event")
+		fmt.Println("eventType: ", eventType)
 		fmt.Fprint(w, "OK\n")
 		// TODO: first this we need to do is authroize the request.
 	})
