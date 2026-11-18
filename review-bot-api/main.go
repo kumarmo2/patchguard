@@ -7,12 +7,17 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
+	app_utils "github.com/kumarmo2/patchguard/review-bot-api/utils"
 )
+
+const CLOUDFLARE_SECRET_NAME string = "CLOUDFLARE_SECRET_NAME"
+const SECRET_PASSWORD_FILE string = "SECRET_PASSWORD_FILE"
 
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /webhooks/github", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("inside the webhook")
 		fmt.Fprint(w, "OK\n")
 		// TODO: first this we need to do is authroize the request.
 	})
@@ -20,6 +25,23 @@ func handler() http.Handler {
 }
 
 func main() {
+
+	env := os.Getenv("env")
+	if env == "" {
+		panic("env is empty")
+	}
+	err := godotenv.Load(fmt.Sprintf(".env.%s", env))
+	if err != nil {
+		os.Exit(1)
+	}
+
+	_, err = app_utils.NewSecretsManager(os.Getenv(SECRET_PASSWORD_FILE))
+
+	if err != nil {
+		os.Exit(1)
+		return
+	}
+
 	port := "8888"
 	if value, ok := os.LookupEnv("PORT"); ok {
 		if _, err := strconv.ParseUint(value, 10, 16); err != nil {
