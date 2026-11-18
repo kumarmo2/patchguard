@@ -12,7 +12,9 @@ import (
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /webhooks/github", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "OK")
+		fmt.Println("inside the webhook")
+		fmt.Fprint(w, "OK\n")
+		// TODO: first this we need to do is authroize the request.
 	})
 	return mux
 }
